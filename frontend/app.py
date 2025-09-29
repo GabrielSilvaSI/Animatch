@@ -119,6 +119,58 @@ if anime_df is not None:
                     st.error("Erro ao gerar a amostra da matriz.")
             except requests.exceptions.ConnectionError:
                 st.error("Não foi possível conectar ao backend.")
+
+    # --- Aba 3: Avaliar Acurácia ---
+    with tab3:
+        st.header("Avaliando a Acurácia do Modelo")
+        test_user = st.selectbox("Selecione um Usuário para o Teste:", user_ids, key="acc_user")
+        if st.button("Calcular Acurácia", type="secondary"):
+            api_url = f"http://127.0.0.1:8000/evaluate_accuracy/{test_user}"
+            try:
+                response = requests.get(api_url)
+                if response.status_code == 200:
+                    data = response.json()
+                    if "error" in data:
+                        st.error(data["error"])
+                    else:
+                        st.subheader(f"Resultados para o Usuário {data['test_user_id']}")
+
+                        col1, col2 = st.columns([1, 2])
+
+                        with col1:
+                            st.metric(label="Precisão do Modelo", value=f"{data['accuracy']:.2%}")
+                            st.write("**Gabarito (Animes a acertar):**")
+                            for anime_truth in data['ground_truth'][:5]:
+                                st.success(anime_truth)
+                            if len(data['ground_truth']) > 5:
+                                st.write("...")
+
+                        with col2:
+                            st.write("**Desempenho das Recomendações**")
+
+                            hits = data['hits']
+                            total_recs = data['total_recommendations']
+                            misses = total_recs - hits
+
+                            # --- ALTERAÇÃO 1: Adicionar uma coluna de cores ao DataFrame ---
+                            chart_data = pd.DataFrame({
+                                "Categoria": ["Acertos", "Erros"],
+                                "Quantidade": [hits, misses],
+                                "Cor": ["#008000", "#FF0000"]  # Coluna com as cores
+                            })
+
+                            # --- ALTERAÇÃO 2: Passar o nome da coluna de cores para o parâmetro 'color' ---
+                            st.bar_chart(chart_data, x="Categoria", y="Quantidade", color="Cor")
+
+                        st.write("**Recomendações Geradas:**")
+                        for rec in data['recommendations']:
+                            if rec in data['ground_truth']:
+                                st.success(f"🎯 {rec} (Acerto!)")
+                            else:
+                                st.info(rec)
+            except requests.exceptions.ConnectionError:
+                st.error("Não foi possível conectar ao backend.")
+
     # --- NOVA Aba 4: Adicionar Avaliações ---
     with tab4:
         st.header("Adicione um Usuário ou Nova Avaliação")
